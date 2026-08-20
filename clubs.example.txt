@@ -1,0 +1,2 @@
+# 每行一个 Fantia Club ID
+18

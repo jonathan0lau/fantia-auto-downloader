@@ -1,0 +1,31 @@
+services:
+  fantia-downloader:
+    build:
+      context: .
+    container_name: fantia-downloader
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+    command:
+      - --config
+      - /config/config.json
+      - --download-root
+      - /downloads
+      - --schedule
+      - ${FANTIA_SCHEDULE:-03:00}
+    volumes:
+      - type: bind
+        source: ./config.json
+        target: /config/config.json
+        read_only: true
+      - type: bind
+        source: ./session.txt
+        target: /config/session.txt
+        read_only: true
+      - type: bind
+        source: ./clubs.txt
+        target: /config/clubs.txt
+        read_only: true
+      - type: bind
+        source: ${FANTIA_DOWNLOAD_DIR:-./downloads}
+        target: /downloads

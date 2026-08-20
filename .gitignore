@@ -1,0 +1,16 @@
+session.txt
+session-*.txt
+config.json
+clubs.txt
+fantia_downloader.log
+.env
+.env.*
+!.env.example
+downloads/
+*.part
+*.part.*
+__pycache__/
+*.pyc
+fantia_downloader1.py
+fantia_downloader_gui.py
+response*.html

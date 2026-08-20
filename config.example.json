@@ -1,0 +1,9 @@
+{
+  "session_file": "session.txt",
+  "club_file": "clubs.txt",
+  "download_root": "D:\\Fantia",
+  "since_days": 7,
+  "schedule": "03:00",
+  "delay": 1.0,
+  "download_free_products": false
+}
