@@ -116,7 +116,9 @@ class FantiaDownloader:
       extension=Path(urlparse(photo_url).path).suffix or ".jpg"
       if photo.get("id"):self.filename_hints[photo_url]=f'{photo["id"]}{extension}'
     if content.get("embed_url") and Path(urlparse(content["embed_url"]).path).suffix.lower() in EXTS:urls.append(content["embed_url"])
-    if urls:groups.append((safe(content.get("title") or "",f"内容_{index}"),uniq(urls)))
+    raw_title=content.get("title") or ""
+    title=safe(raw_title,"") if str(raw_title).strip() else ""
+    if urls:groups.append((title,uniq(urls)))
    if groups:return groups
   groups=[]
   for index,content in enumerate(soup.select(".post-content-inner"),1):
@@ -126,12 +128,12 @@ class FantiaDownloader:
    title_node=content.select_one(".post-content-title,h2")
    raw_title=title_node.get_text(" ",strip=True) if title_node else ""
    if not raw_title and isinstance(scoped,dict):raw_title=scoped.get("title") or scoped.get("content_title") or ""
-   title=safe(raw_title,f"内容_{index}")
+   title=safe(raw_title,"") if str(raw_title).strip() else ""
    urls=self.media(scoped,BeautifulSoup(str(body),"html.parser"))
    if urls:groups.append((title,urls))
   if not groups:
    urls=self.media(data,soup)
-   if urls:groups.append(("无标题",urls))
+   if urls:groups.append(("",urls))
   return groups
  def product_ids(self,cid):
   ids=[]; seen=set(); page=1
@@ -301,7 +303,7 @@ class FantiaDownloader:
     try:self.download(thumb_url,folder,updated_at=p["date"])
     except Exception as e:logging.error("封面下载失败 %s: %s",thumb_url,e)
    for plan,urls in groups:
-    plan_folder=folder/plan; plan_folder.mkdir(parents=True,exist_ok=True)
+    plan_folder=folder/plan if plan else folder; plan_folder.mkdir(parents=True,exist_ok=True)
     for j,u in enumerate(urls,1):
      try:self.download(u,plan_folder,j,p["date"])
      except Exception as e:logging.error("下载失败 %s: %s",u,e)

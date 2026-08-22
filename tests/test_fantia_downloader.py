@@ -93,5 +93,58 @@ class ProductSafetyTests(unittest.TestCase):
         self.assertEqual(posts[-1][1]["data"]["agree_to_terms_of_service"], "true")
 
 
+class MediaGroupingTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.downloader = FantiaDownloader("test-session", Path(self.temp_dir.name), 0)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_api_content_without_title_has_no_generated_folder_name(self):
+        data = {
+            "post": {
+                "post_contents": [{
+                    "title": "",
+                    "post_content_photos": [{
+                        "id": 123,
+                        "url": {"original": "https://example.test/post_content/file/123/photo.jpg"},
+                    }],
+                }]
+            }
+        }
+
+        groups = self.downloader.media_groups(data, BeautifulSoup("<html></html>", "html.parser"))
+
+        self.assertEqual(groups[0][0], "")
+
+    def test_html_content_without_title_has_no_generated_folder_name(self):
+        html = """
+        <div class="post-content-inner">
+          <div class="post-content-body">
+            <img src="https://example.test/post_content/file/456/photo.jpg">
+          </div>
+        </div>
+        """
+
+        groups = self.downloader.media_groups({}, BeautifulSoup(html, "html.parser"))
+
+        self.assertEqual(groups[0][0], "")
+
+    def test_titled_content_keeps_its_folder_name(self):
+        data = {
+            "post": {
+                "post_contents": [{
+                    "title": "Plan A",
+                    "download_uri": "/download/example.zip",
+                }]
+            }
+        }
+
+        groups = self.downloader.media_groups(data, BeautifulSoup("<html></html>", "html.parser"))
+
+        self.assertEqual(groups[0][0], "Plan A")
+
+
 if __name__ == "__main__":
     unittest.main()
