@@ -11,8 +11,12 @@ from bs4 import BeautifulSoup
 BASE="https://fantia.jp"; CONTROL=re.compile(r'[\x00-\x1f]')
 FULLWIDTH=str.maketrans({'<':'＜','>':'＞',':':'：','"':'＂','/':'／','\\':'＼','|':'｜','?':'？','*':'＊'})
 EXTS={".jpg",".jpeg",".png",".gif",".webp",".bmp",".mp4",".mov",".webm",".mkv",".m4v",".zip"}
+UNTITLED_PLAN=re.compile(r"(?:内容[\s_-]*\d+|无标题|無題)",re.I)
 logging.basicConfig(level=logging.INFO,format="%(asctime)s %(levelname)s %(message)s",handlers=[logging.FileHandler("fantia_downloader.log",encoding="utf-8"),logging.StreamHandler()])
 def safe(s,f): return CONTROL.sub("_",str(s).translate(FULLWIDTH)).strip(" .")[:150] or f
+def plan_title(value):
+ title=safe(value,"") if str(value or "").strip() else ""
+ return "" if UNTITLED_PLAN.fullmatch(title) else title
 def uniq(xs): return list(dict.fromkeys(x for x in xs if x))
 class FantiaDownloader:
  def __init__(self,session,root,delay=1):
@@ -116,8 +120,7 @@ class FantiaDownloader:
       extension=Path(urlparse(photo_url).path).suffix or ".jpg"
       if photo.get("id"):self.filename_hints[photo_url]=f'{photo["id"]}{extension}'
     if content.get("embed_url") and Path(urlparse(content["embed_url"]).path).suffix.lower() in EXTS:urls.append(content["embed_url"])
-    raw_title=content.get("title") or ""
-    title=safe(raw_title,"") if str(raw_title).strip() else ""
+    title=plan_title(content.get("title"))
     if urls:groups.append((title,uniq(urls)))
    if groups:return groups
   groups=[]
@@ -128,13 +131,28 @@ class FantiaDownloader:
    title_node=content.select_one(".post-content-title,h2")
    raw_title=title_node.get_text(" ",strip=True) if title_node else ""
    if not raw_title and isinstance(scoped,dict):raw_title=scoped.get("title") or scoped.get("content_title") or ""
-   title=safe(raw_title,"") if str(raw_title).strip() else ""
+   title=plan_title(raw_title)
    urls=self.media(scoped,BeautifulSoup(str(body),"html.parser"))
    if urls:groups.append((title,urls))
   if not groups:
    urls=self.media(data,soup)
    if urls:groups.append(("",urls))
   return groups
+ def migrate_legacy_untitled_folders(self,folder):
+  moved=0
+  for legacy in list(folder.iterdir()):
+   if not legacy.is_dir() or not UNTITLED_PLAN.fullmatch(legacy.name):continue
+   for source in list(legacy.iterdir()):
+    if not source.is_file():continue
+    target=folder/source.name
+    if target.exists():
+     logging.warning("旧无标题目录中的文件与帖子根目录同名，保留原处且不覆盖：%s",source)
+     continue
+    source.replace(target); moved+=1
+    logging.info("旧无标题文件已移回帖子根目录：%s",target)
+   try:legacy.rmdir()
+   except OSError:pass
+  return moved
  def product_ids(self,cid):
   ids=[]; seen=set(); page=1
   while True:
@@ -295,6 +313,7 @@ class FantiaDownloader:
     try:p["date"]=datetime.fromisoformat(t["datetime"].replace("Z","+00:00"))
     except ValueError:pass
    folder=self.root/name/p["date"].strftime("%Y%m")/p["title"]; folder.mkdir(parents=True,exist_ok=True); groups=self.media_groups(data,soup)
+   if any(not plan for plan,_ in groups):self.migrate_legacy_untitled_folders(folder)
    thumb=(api_post.get("thumb") or {}) if isinstance(api_post,dict) else {}
    thumb_url=thumb.get("original") or thumb.get("main") or thumb.get("large")
    if thumb_url:

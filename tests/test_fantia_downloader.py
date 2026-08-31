@@ -4,7 +4,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from fantia_downloader import FantiaDownloader
+from fantia_downloader import FantiaDownloader, plan_title
 
 
 def product_html(product_id, price, price_text="DL商品", owned=False):
@@ -144,6 +144,46 @@ class MediaGroupingTests(unittest.TestCase):
         groups = self.downloader.media_groups(data, BeautifulSoup("<html></html>", "html.parser"))
 
         self.assertEqual(groups[0][0], "Plan A")
+
+    def test_legacy_placeholder_titles_are_treated_as_untitled(self):
+        for title in ("内容_1", "内容-2", "无标题", "無題"):
+            with self.subTest(title=title):
+                self.assertEqual(plan_title(title), "")
+        self.assertEqual(plan_title("写真内容 1"), "写真内容 1")
+
+    def test_api_placeholder_title_downloads_to_post_root(self):
+        data = {
+            "post": {
+                "post_contents": [{
+                    "title": "无标题",
+                    "download_uri": "/download/example.zip",
+                }]
+            }
+        }
+
+        groups = self.downloader.media_groups(data, BeautifulSoup("<html></html>", "html.parser"))
+
+        self.assertEqual(groups[0][0], "")
+
+    def test_legacy_untitled_files_are_moved_without_overwriting(self):
+        post = Path(self.temp_dir.name) / "post"
+        content_folder = post / "内容_1"
+        untitled_folder = post / "无标题"
+        content_folder.mkdir(parents=True)
+        untitled_folder.mkdir()
+        (content_folder / "photo.jpg").write_bytes(b"photo")
+        (untitled_folder / "movie.mov").write_bytes(b"movie")
+        (untitled_folder / "same.jpg").write_bytes(b"legacy")
+        (post / "same.jpg").write_bytes(b"current")
+
+        moved = self.downloader.migrate_legacy_untitled_folders(post)
+
+        self.assertEqual(moved, 2)
+        self.assertEqual((post / "photo.jpg").read_bytes(), b"photo")
+        self.assertEqual((post / "movie.mov").read_bytes(), b"movie")
+        self.assertEqual((post / "same.jpg").read_bytes(), b"current")
+        self.assertEqual((untitled_folder / "same.jpg").read_bytes(), b"legacy")
+        self.assertFalse(content_folder.exists())
 
 
 if __name__ == "__main__":
