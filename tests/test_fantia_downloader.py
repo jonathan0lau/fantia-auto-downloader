@@ -165,6 +165,47 @@ class MediaGroupingTests(unittest.TestCase):
 
         self.assertEqual(groups[0][0], "")
 
+    def test_locked_micro_photos_and_unrelated_post_data_are_ignored(self):
+        data = {
+            "post": {
+                "fanclub": {
+                    "icon": {"original": "https://example.test/uploads/fanclub/icon.jpg"},
+                },
+                "recommended_post": {
+                    "thumb": "https://example.test/uploads/post/file/999/main_other.jpg",
+                },
+                "post_contents": [{
+                    "id": 10,
+                    "title": "",
+                    "visible_status": "catchable",
+                    "post_content_photos_micro": [{
+                        "id": 100,
+                        "url": {
+                            "micro": "https://example.test/uploads/post_content_photo/file/100/micro_photo.jpg",
+                        },
+                    }],
+                }],
+            }
+        }
+
+        groups = self.downloader.media_groups(data, BeautifulSoup("<html></html>", "html.parser"))
+
+        self.assertEqual(groups, [])
+
+    def test_scoped_json_accepts_original_but_not_micro_variant(self):
+        data = {
+            "post_content_photos": [{
+                "url": {
+                    "original": "https://example.test/uploads/post_content_photo/file/100/photo.jpg",
+                    "micro": "https://example.test/uploads/post_content_photo/file/100/micro_photo.jpg",
+                }
+            }]
+        }
+
+        urls = self.downloader.media(data, BeautifulSoup("<html></html>", "html.parser"))
+
+        self.assertEqual(urls, ["https://example.test/uploads/post_content_photo/file/100/photo.jpg"])
+
     def test_legacy_untitled_files_are_moved_without_overwriting(self):
         post = Path(self.temp_dir.name) / "post"
         content_folder = post / "内容_1"

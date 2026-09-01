@@ -86,7 +86,9 @@ class FantiaDownloader:
   c=[]
   for key,url in self.walk(data):
    path=unquote(urlparse(url).path).lower()
-   if any(x in key for x in ("original","download","file","movie","video")) or Path(path).suffix in EXTS or ".m3u8" in path: c.append((0 if "original" in key or "download" in key else 1,url))
+   explicit=any(x in key for x in ("original","download","file","movie","video","hls"))
+   post_asset="post_content" in path or "/download" in path or ".m3u8" in path
+   if explicit and post_asset:c.append((0 if "original" in key or "download" in key else 1,url))
   for content in soup.select(".post-content-inner:not(.is-lock) .post-content-body,.post-content-body"):
    for n in content.select("img,source,video,a[href]"):
     u=n.get("data-src") or n.get("src") or n.get("srcset") or n.get("href")
@@ -135,7 +137,9 @@ class FantiaDownloader:
    urls=self.media(scoped,BeautifulSoup(str(body),"html.parser"))
    if urls:groups.append((title,urls))
   if not groups:
-   urls=self.media(data,soup)
+   # Never scan the complete post JSON as a fallback. It also contains Club/Plan/product
+   # images, other post thumbnails, and locked gallery micro previews.
+   urls=self.media({},soup)
    if urls:groups.append(("",urls))
   return groups
  def migrate_legacy_untitled_folders(self,folder):
